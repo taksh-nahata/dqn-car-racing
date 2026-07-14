@@ -40,7 +40,7 @@ class DQN(nn.Module):
         x = x.view(x.size(0), -1)
         return self.fc(x)
 
-env = gym.make("CarRacing-v2", continuous=False)
+env = gym.make("CarRacing-v3", continuous=False)
 action_dim = env.action_space.n
 
 policy_net = DQN(action_dim).to(device)
@@ -104,7 +104,7 @@ for episode in range(10):
 
 plt.figure(figsize=(10, 5))
 plt.plot(rewards_history, marker='o', color='red', label="DQN Reward")
-plt.title("Custom DQN Learning Progress on CarRacing-v2")
+plt.title("Custom DQN Learning Progress on CarRacing-v3")
 plt.xlabel("Episode")
 plt.ylabel("Total Reward")
 plt.grid(True)
