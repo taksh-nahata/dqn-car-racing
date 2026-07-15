@@ -18,9 +18,9 @@ EPS_START = 1.0
 EPS_END = 0.05
 EPS_DECAY = 0.93
 
-class DQN(nn.Module):
+class DuelingDQN(nn.Module):
     def __init__(self, action_dim):
-        super(DQN, self).__init__()
+        super(DuelingDQN, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=5, stride=2),
             nn.ReLU(),
@@ -29,7 +29,12 @@ class DQN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=5, stride=2),
             nn.ReLU()
         )
-        self.fc = nn.Sequential(
+        self.value_stream = nn.Sequential(
+            nn.Linear(64 * 9 * 9, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+        self.advantage_stream = nn.Sequential(
             nn.Linear(64 * 9 * 9, 256),
             nn.ReLU(),
             nn.Linear(256, action_dim)
@@ -38,16 +43,15 @@ class DQN(nn.Module):
     def forward(self, x):
         features = self.conv(x)
         features = features.view(features.size(0), -1)
-        value = self.value_stream(features)
+        values = self.value_stream(features)
         advantages = self.advantage_stream(features)
-        q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
-        return q_values
+        return values + (advantages - advantages.mean(dim=1, keepdim=True))
 
 env = gym.make("CarRacing-v3", continuous=False)
 action_dim = env.action_space.n
 
-policy_net = DQN(action_dim).to(device)
-target_net = DQN(action_dim).to(device)
+policy_net = DuelingDQN(action_dim).to(device)
+target_net = DuelingDQN(action_dim).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 optimizer = optim.Adam(policy_net.parameters(), lr=LR)
 memory = deque(maxlen=BUFFER_SIZE)
@@ -55,7 +59,7 @@ memory = deque(maxlen=BUFFER_SIZE)
 epsilon = EPS_START
 rewards_history = []
 
-print("Starting DQN Training Loop (Refined Version)...")
+print("Starting REFINED Dueling-DQN Training Loop...")
 for episode in range(10): 
     state, _ = env.reset()
     state = np.transpose(state, (2, 0, 1))
@@ -105,10 +109,10 @@ for episode in range(10):
         target_net.load_state_dict(policy_net.state_dict())
 
 plt.figure(figsize=(10, 5))
-plt.plot(rewards_history, marker='o', color='red', label="DQN Reward")
-plt.title("Custom DQN Learning Progress on CarRacing-v3")
+plt.plot(rewards_history, marker="o", color="green", label="Refined Dueling DQN")
+plt.title("Refined Dueling DQN Learning Progress on CarRacing-v3")
 plt.xlabel("Episode")
 plt.ylabel("Total Reward")
 plt.grid(True)
-plt.savefig("dqn_learning_curve.png")
-print("Saved dqn_learning_curve.png successfully!")
+plt.savefig("dqn_refined_learning_curve.png")
+print("Saved dqn_refined_learning_curve.png successfully!")
