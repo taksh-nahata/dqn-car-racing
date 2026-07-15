@@ -10,17 +10,17 @@ from collections import deque
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 GAMMA = 0.99
-LR = 1e-4
+LR = 5e-5
 BATCH_SIZE = 64
-BUFFER_SIZE = 10000
-TARGET_UPDATE = 5
+BUFFER_SIZE = 15000
+TARGET_UPDATE = 2
 EPS_START = 1.0
 EPS_END = 0.05
-EPS_DECAY = 0.9
+EPS_DECAY = 0.93
 
-class DQN(nn.Module):
+class DuelingDQN(nn.Module):
     def __init__(self, action_dim):
-        super(DQN, self).__init__()
+        super(DuelingDQN, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=5, stride=2),
             nn.ReLU(),
@@ -29,22 +29,29 @@ class DQN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=5, stride=2),
             nn.ReLU()
         )
-        self.fc = nn.Sequential(
+        self.value_stream = nn.Sequential(
+            nn.Linear(64 * 9 * 9, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+        self.advantage_stream = nn.Sequential(
             nn.Linear(64 * 9 * 9, 256),
             nn.ReLU(),
             nn.Linear(256, action_dim)
         )
         
     def forward(self, x):
-        x = self.conv(x)
-        x = x.view(x.size(0), -1)
-        return self.fc(x)
+        features = self.conv(x)
+        features = features.view(features.size(0), -1)
+        values = self.value_stream(features)
+        advantages = self.advantage_stream(features)
+        return values + (advantages - advantages.mean(dim=1, keepdim=True))
 
 env = gym.make("CarRacing-v3", continuous=False)
 action_dim = env.action_space.n
 
-policy_net = DQN(action_dim).to(device)
-target_net = DQN(action_dim).to(device)
+policy_net = DuelingDQN(action_dim).to(device)
+target_net = DuelingDQN(action_dim).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 optimizer = optim.Adam(policy_net.parameters(), lr=LR)
 memory = deque(maxlen=BUFFER_SIZE)
@@ -52,7 +59,7 @@ memory = deque(maxlen=BUFFER_SIZE)
 epsilon = EPS_START
 rewards_history = []
 
-print("Starting DQN Training Loop...")
+print("Starting REFINED Dueling-DQN Training Loop...")
 for episode in range(10): 
     state, _ = env.reset()
     state = np.transpose(state, (2, 0, 1))
@@ -102,10 +109,10 @@ for episode in range(10):
         target_net.load_state_dict(policy_net.state_dict())
 
 plt.figure(figsize=(10, 5))
-plt.plot(rewards_history, marker='o', color='red', label="DQN Reward")
-plt.title("Custom DQN Learning Progress on CarRacing-v3")
+plt.plot(rewards_history, marker="o", color="green", label="Refined Dueling DQN")
+plt.title("Refined Dueling DQN Learning Progress on CarRacing-v3")
 plt.xlabel("Episode")
 plt.ylabel("Total Reward")
 plt.grid(True)
-plt.savefig("dqn_learning_curve.png")
-print("Saved dqn_learning_curve.png successfully!")
+plt.savefig("dqn_refined_learning_curve.png")
+print("Saved dqn_refined_learning_curve.png successfully!")
