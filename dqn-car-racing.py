@@ -10,13 +10,13 @@ from collections import deque
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 GAMMA = 0.99
-LR = 1e-4
+LR = 5e-5
 BATCH_SIZE = 64
-BUFFER_SIZE = 10000
-TARGET_UPDATE = 5
+BUFFER_SIZE = 15000
+TARGET_UPDATE = 2
 EPS_START = 1.0
 EPS_END = 0.05
-EPS_DECAY = 0.9
+EPS_DECAY = 0.93
 
 class DQN(nn.Module):
     def __init__(self, action_dim):
@@ -36,9 +36,12 @@ class DQN(nn.Module):
         )
         
     def forward(self, x):
-        x = self.conv(x)
-        x = x.view(x.size(0), -1)
-        return self.fc(x)
+        features = self.conv(x)
+        features = features.view(features.size(0), -1)
+        value = self.value_stream(features)
+        advantages = self.advantage_stream(features)
+        q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
+        return q_values
 
 env = gym.make("CarRacing-v3", continuous=False)
 action_dim = env.action_space.n
@@ -52,7 +55,7 @@ memory = deque(maxlen=BUFFER_SIZE)
 epsilon = EPS_START
 rewards_history = []
 
-print("Starting DQN Training Loop...")
+print("Starting DQN Training Loop (Refined Version)...")
 for episode in range(10): 
     state, _ = env.reset()
     state = np.transpose(state, (2, 0, 1))
@@ -60,7 +63,6 @@ for episode in range(10):
     done = False
     
     while not done:
-       
         if random.random() < epsilon:
             action = env.action_space.sample()
         else:
